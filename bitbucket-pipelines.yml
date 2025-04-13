@@ -1,0 +1,142 @@
+image: mcr.microsoft.com/playwright:v1.50.1-noble
+
+definitions:
+  caches:
+    npm: ~/.npm
+
+pipelines:
+  default:
+    - step:
+        name: Install dependencies
+        caches:
+          - npm
+        script:
+          - npm ci
+          - npx playwright install --with-deps chromium firefox webkit
+        artifacts:
+          - node_modules/**
+          - playwright-report/**
+          - package-lock.json
+
+    - parallel:
+        - step:
+            name: Run tests - Chromium
+            script:
+              - mkdir -p test-results/{allure,screenshots,videos}
+              - mkdir -p allure-results
+              - export BROWSER=chromium
+              - export TEST_ENV=testdev1
+              - export HEADLESS=true
+              - export RECORD_VIDEO=true
+              - npm run test:registration:chromium:docker
+              - npm run allure:generate
+            artifacts:
+              - test-results/**
+              - allure-results/**
+            services:
+              - docker
+            size: 2x
+
+        - step:
+            name: Run tests - Firefox
+            script:
+              - mkdir -p test-results/{allure,screenshots,videos}
+              - mkdir -p allure-results
+              - export BROWSER=firefox
+              - export TEST_ENV=testdev1
+              - export HEADLESS=true
+              - export RECORD_VIDEO=true
+              - npm run test:registration:firefox:docker
+              - npm run allure:generate
+            artifacts:
+              - test-results/**
+              - allure-results/**
+            services:
+              - docker
+            size: 2x
+
+        - step:
+            name: Run tests - WebKit
+            script:
+              - mkdir -p test-results/{allure,screenshots,videos}
+              - mkdir -p allure-results
+              - export BROWSER=webkit
+              - export TEST_ENV=testdev1
+              - export HEADLESS=true
+              - export RECORD_VIDEO=true
+              - npm run test:registration:webkit:docker
+              - npm run allure:generate
+            artifacts:
+              - test-results/**
+              - allure-results/**
+            services:
+              - docker
+            size: 2x
+
+    - step:
+        name: Combine reports
+        script:
+          - mkdir -p combined-report
+          - npm run allure:generate
+          - cp -r test-results/allure-report/* combined-report/
+        artifacts:
+          - combined-report/**
+
+
+  branches:
+    main:
+      - step:
+          name: Install dependencies
+          caches:
+            - npm
+          script:
+            - npm ci
+            - npx playwright install --with-deps chromium firefox webkit
+          artifacts:
+            - node_modules/**
+            - package-lock.json
+
+      - parallel:
+          - step:
+              name: Run tests - Chromium
+              script:
+                - mkdir -p test-results/{allure,screenshots,videos}
+                - mkdir -p allure-results
+                - export BROWSER=chromium
+                - export TEST_ENV=testdev1
+                - export HEADLESS=true
+                - export RECORD_VIDEO=true
+                - npm run test:registration:chromium:docker
+                - npm run allure:generate
+              artifacts:
+                - test-results/**
+                - allure-results/**
+              services:
+                - docker
+              size: 2x
+          - step:
+              name: Run tests - Firefox
+              script:
+                - mkdir -p test-results/{allure,screenshots,videos}
+                - mkdir -p allure-results
+                - export BROWSER=firefox
+                - export TEST_ENV=testdev1
+                - export HEADLESS=true
+                - export RECORD_VIDEO=true
+                - npm run test:registration:firefox:docker
+                - npm run allure:generate
+              artifacts:
+                - test-results/**
+                - allure-results/**
+              services:
+                - docker
+              size: 2x
+
+      - step:
+          name: Generate final report
+          script:
+            - mkdir -p combined-report
+            - npm run allure:generate
+            - cp -r test-results/allure-report/* combined-report/
+          artifacts:
+            - combined-report/**
